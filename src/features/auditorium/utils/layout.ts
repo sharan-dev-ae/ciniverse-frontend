@@ -1,4 +1,5 @@
 import type { Seat, SeatCategory, SeatStatus } from '../../../types/domain'
+export { getPlatformTop, getSeatEyePosition, getSeatWorldPosition } from './camera'
 
 export const CATEGORY_PRICES: Record<SeatCategory, number> = { standard: 14, premium: 20, vip: 30 }
 
