@@ -1,0 +1,9 @@
+import { Menu, Ticket, X } from 'lucide-react'
+import { useState } from 'react'
+import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Toast } from '../feedback/Toast'
+
+const links=[['/movies','Movies'],['/my-bookings','My bookings'],['/admin/auditorium','Auditorium designer']]
+export function Layout(){ const [open,setOpen]=useState(false); return <div className="cinema-grain min-h-screen bg-ink text-slate-50">
+  <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[.07] bg-ink/75 backdrop-blur-xl"><div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 py-4 lg:px-8"><Link to="/" className="flex items-center gap-2 text-xl font-extrabold tracking-tight"><span className="grid size-9 place-items-center rounded-full bg-accent"><Ticket size={19}/></span>Cine<span className="text-accent">Verse</span></Link><nav className="hidden items-center gap-8 md:flex">{links.map(([to,label])=><NavLink key={to} to={to} className={({isActive})=>`text-sm font-medium transition hover:text-white ${isActive?'text-white':'text-muted'}`}>{label}</NavLink>)}</nav><button className="md:hidden" onClick={()=>setOpen(!open)} aria-label="Toggle navigation">{open?<X/>:<Menu/>}</button></div>{open&&<nav className="border-t border-line px-5 py-4 md:hidden">{links.map(([to,label])=><NavLink key={to} to={to} onClick={()=>setOpen(false)} className="block py-3 text-sm text-slate-200">{label}</NavLink>)}</nav>}</header>
+  <main className="min-h-screen pt-[72px]"><Outlet/></main><footer className="border-t border-line bg-panel px-5 py-10"><div className="mx-auto flex max-w-7xl flex-col justify-between gap-4 text-sm text-muted md:flex-row"><p>© 2026 CineVerse. Demonstration experience only.</p><p>Don’t just book a seat. <span className="text-white">Experience it.</span></p></div></footer><Toast/></div> }
