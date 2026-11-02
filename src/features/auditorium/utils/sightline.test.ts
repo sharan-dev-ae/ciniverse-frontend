@@ -60,7 +60,7 @@ describe('sightline toggle behavior', () => {
     expect(getSightlineVisibility(true, false, 'overview').visible).toBe(false)
   })
 
-  it('keeps only the screen marker in first-person mode', () => {
-    expect(getSightlineVisibility(true, true, 'seat-view')).toEqual({ visible:true, showBeam:false, showEyeMarker:false, showScreenMarker:true })
+  it('keeps the centerline and screen marker in first-person mode', () => {
+    expect(getSightlineVisibility(true, true, 'seat-view')).toEqual({ visible:true, showBeam:false, showCenterline:true, showEyeMarker:false, showScreenMarker:true })
   })
 })

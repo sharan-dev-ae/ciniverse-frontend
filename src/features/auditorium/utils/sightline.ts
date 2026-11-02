@@ -68,5 +68,5 @@ export function createViewingBeamData(origin: THREE.Vector3, screenBoundary: rea
 }
 
 export function getSightlineVisibility(enabled: boolean, hasSeat: boolean, mode: CameraMode) {
-  return { visible: enabled && hasSeat, showBeam: enabled && hasSeat && mode !== 'seat-view', showEyeMarker: enabled && hasSeat && mode !== 'seat-view', showScreenMarker: enabled && hasSeat }
+  return { visible: enabled && hasSeat, showBeam: enabled && hasSeat && mode !== 'seat-view', showCenterline: enabled && hasSeat && mode === 'seat-view', showEyeMarker: enabled && hasSeat && mode !== 'seat-view', showScreenMarker: enabled && hasSeat }
 }

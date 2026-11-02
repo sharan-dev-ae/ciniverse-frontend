@@ -41,18 +41,22 @@ function SightlineVisualization({ seat, screenCenter, screenBoundary, seatView, 
   const measurement = useMemo(() => seat ? calculateSightline(seat, screenCenter, seatView) : null, [screenCenter, seat, seatView])
   const surfaceGeometry = useMemo(() => new THREE.BufferGeometry(), [])
   const edgeGeometry = useMemo(() => new THREE.BufferGeometry(), [])
+  const centerlineGeometry = useMemo(() => new THREE.BufferGeometry(), [])
   useLayoutEffect(() => {
     if (!measurement) return
     const beam = createViewingBeamData(measurement.origin, screenBoundary)
     surfaceGeometry.setAttribute('position', new THREE.BufferAttribute(beam.surfacePositions, 3))
     edgeGeometry.setAttribute('position', new THREE.BufferAttribute(beam.edgePositions, 3))
+    centerlineGeometry.setFromPoints([measurement.origin, measurement.target])
     surfaceGeometry.computeBoundingSphere()
     edgeGeometry.computeBoundingSphere()
-  }, [edgeGeometry, measurement, screenBoundary, surfaceGeometry])
-  useEffect(() => () => { surfaceGeometry.dispose(); edgeGeometry.dispose() }, [edgeGeometry, surfaceGeometry])
+    centerlineGeometry.computeBoundingSphere()
+  }, [centerlineGeometry, edgeGeometry, measurement, screenBoundary, surfaceGeometry])
+  useEffect(() => () => { surfaceGeometry.dispose(); edgeGeometry.dispose(); centerlineGeometry.dispose() }, [centerlineGeometry, edgeGeometry, surfaceGeometry])
   if (!visibility.visible || !measurement) return null
   return <group raycast={() => undefined}>
     {visibility.showBeam && <><mesh geometry={surfaceGeometry} renderOrder={3} raycast={() => undefined}><meshBasicMaterial color="#FACC15" transparent opacity={.075} side={THREE.DoubleSide} depthWrite={false} depthTest blending={THREE.NormalBlending} /></mesh><lineSegments geometry={edgeGeometry} renderOrder={4} raycast={() => undefined}><lineBasicMaterial color="#FACC15" transparent opacity={.48} blending={THREE.AdditiveBlending} depthWrite={false} depthTest /></lineSegments></>}
+    {visibility.showCenterline && <lineSegments geometry={centerlineGeometry} renderOrder={4} raycast={() => undefined}><lineBasicMaterial color="#FACC15" transparent opacity={.55} blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} /></lineSegments>}
     {visibility.showEyeMarker && <mesh position={measurement.origin} raycast={() => undefined}><sphereGeometry args={[.085, 12, 12]} /><meshBasicMaterial color="#FACC15" transparent opacity={.9} depthWrite={false} /></mesh>}
     {visibility.showScreenMarker && <mesh position={[measurement.target.x, measurement.target.y, measurement.target.z + .035]} raycast={() => undefined}><ringGeometry args={[.12, .19, 24]} /><meshBasicMaterial color="#FACC15" transparent opacity={.85} side={THREE.DoubleSide} depthWrite={false} /></mesh>}
   </group>
