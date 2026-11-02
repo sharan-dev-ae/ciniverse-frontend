@@ -12,6 +12,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .glass { background: rgba(17,29,53,.84); backdrop-filter: blur(20px); border: 1px solid rgba(148,163,184,.14); }
 .cinema-grain::after { content: ''; pointer-events: none; position: fixed; inset: 0; opacity: .025; z-index: 50; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E"); }
 .text-balance { text-wrap: balance; }
+.app-viewport .max-w-7xl { max-width: none; }
+.app-viewport > .mx-auto:not(.max-w-xl):not(.max-w-3xl) { width: 100%; max-width: none; }
+.app-viewport > section > .max-w-7xl { max-width: none; }
 .field { margin-top: .5rem; height: 2.75rem; width: 100%; border-radius: .75rem; border: 1px solid #294064; background: #080f20; padding: 0 .75rem; color: #eaf2ff; outline: none; }
 .field:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.12); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }

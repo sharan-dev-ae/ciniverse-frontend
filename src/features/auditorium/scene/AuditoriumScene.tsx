@@ -9,10 +9,9 @@ import type { GeneratedAuditoriumLayout } from '../utils/layoutEngine'
 import { calculateSightline, getSightlineVisibility } from '../utils/sightline'
 import { createCameraSafetyBounds, getSafeOverviewPose } from '../utils/cameraSafety'
 import { CinematicCameraController } from './CinematicCameraController'
+import { CLASSIC_RED_THEME, createClassicCarpetTexture } from '../utils/auditoriumTheme'
 
 export type { CameraMode } from '../utils/camera'
-const stateColors = { available: '#173d7a', selected: '#2563eb', held: '#38bdf8', booked: '#334155', disabled: '#111827' }
-
 interface SeatResources { base: THREE.BoxGeometry; back: THREE.BoxGeometry; arm: THREE.BoxGeometry; materials: Record<string, THREE.MeshStandardMaterial> }
 function CinemaSeat({ seat, resources, scale, interactive, selectedSeatId, onSeatSelect, reclineAngle }: { seat: Seat; resources: SeatResources; scale: number; interactive: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; reclineAngle: number }) {
   const bookingSelected = useBookingStore(state => state.selectedSeats.some(item => item.id === seat.id))
@@ -20,14 +19,15 @@ function CinemaSeat({ seat, resources, scale, interactive, selectedSeatId, onSea
   const toggle = useBookingStore(state => state.toggleSeat)
   const [hovered, setHovered] = useState(false)
   const position = useMemo(() => getSeatWorldPosition(seat), [seat])
-  const color = selected ? stateColors.selected : stateColors[seat.status]
-  const material = resources.materials[selected ? 'selected' : seat.status === 'available' ? seat.category : seat.status]
+  const materialKey = selected ? 'selected' : seat.status === 'available' ? seat.category : seat.status
+  const material = resources.materials[materialKey]
+  const backMaterial = resources.materials[`${materialKey}Back`] ?? material
   return <group position={position} rotation={[0, seat.rotation, 0]} scale={scale * (seat.category === 'vip' ? 1.12 : 1)}
     onPointerOver={event => { event.stopPropagation(); setHovered(true); document.body.style.cursor = interactive && seat.status === 'available' ? 'pointer' : 'default' }}
     onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto' }}
     onClick={event => { event.stopPropagation(); if (onSeatSelect) onSeatSelect(seat); else if (interactive && seat.status === 'available') toggle(seat) }}>
     <mesh geometry={resources.base} material={material} position={[0, .25, .05]} />
-    <mesh geometry={resources.back} material={material} position={[0, .82, .35]} rotation={[-.08 - THREE.MathUtils.degToRad(selected ? reclineAngle : 0), 0, 0]} />
+    <mesh geometry={resources.back} material={backMaterial} position={[0, .82, .35]} rotation={[-.08 - THREE.MathUtils.degToRad(selected ? reclineAngle : 0), 0, 0]} />
     <mesh geometry={resources.arm} material={resources.materials.arm} position={[-.53, .42, .1]} />
     <mesh geometry={resources.arm} material={resources.materials.arm} position={[.53, .42, .1]} />
     {hovered && <Html center position={[0, 1.55, 0]}><div className="pointer-events-none w-44 rounded-xl border border-white/10 bg-ink/95 p-3 text-xs shadow-2xl"><p className="font-bold text-white">Seat {seat.id}</p><p className="mt-1 capitalize text-muted">Row {seat.row} · {seat.category} · ${seat.price}</p><p className="mt-1 capitalize text-gold">{selected ? 'selected' : seat.status}</p></div></Html>}
@@ -63,7 +63,7 @@ function CinematicScreen({ layout }: { layout: GeneratedAuditoriumLayout }) {
   return <group><mesh position={[0, screen.y, screen.z - .12]}><boxGeometry args={[screen.width + .55, screen.height + .55, .24]} /><meshStandardMaterial color="#090a0e" metalness={.6} roughness={.3} /></mesh><mesh position={[0, screen.y, screen.z]}><planeGeometry args={[screen.width, screen.height]} /><meshBasicMaterial map={texture} toneMapped={false} side={THREE.DoubleSide} /></mesh></group>
 }
 
-function TierArchitecture({ layout }: { layout: GeneratedAuditoriumLayout }) {
+function TierArchitecture({ layout, carpet }: { layout: GeneratedAuditoriumLayout; carpet: THREE.Texture }) {
   const platforms = useRef<THREE.InstancedMesh>(null)
   const aisles = useRef<THREE.InstancedMesh>(null)
   useLayoutEffect(() => {
@@ -73,24 +73,30 @@ function TierArchitecture({ layout }: { layout: GeneratedAuditoriumLayout }) {
     if (platforms.current) platforms.current.instanceMatrix.needsUpdate = true
     if (aisles.current) aisles.current.instanceMatrix.needsUpdate = true
   }, [layout])
-  return <><instancedMesh ref={platforms} args={[undefined, undefined, layout.platforms.length]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#101a2d" /></instancedMesh><instancedMesh ref={aisles} args={[undefined, undefined, layout.aisleSteps.length]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#10284a" emissive="#2563eb" emissiveIntensity={.35} /></instancedMesh></>
+  return <><instancedMesh ref={platforms} args={[undefined, undefined, layout.platforms.length]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial map={carpet} color="#ffffff" roughness={.92} metalness={0} /></instancedMesh><instancedMesh ref={aisles} args={[undefined, undefined, layout.aisleSteps.length]}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#4a170d" emissive={CLASSIC_RED_THEME.amber} emissiveIntensity={.58} roughness={.7} /></instancedMesh></>
+}
+
+function WallAccents({ layout }: { layout: GeneratedAuditoriumLayout }) {
+  const positions = Array.from({ length: 5 }, (_, index) => layout.config.screen.z + 3 + index * Math.max(2.4, (layout.depth - 6) / 4))
+  return <>{positions.flatMap((z, index) => [-1, 1].map(side => <mesh key={`${side}-${index}`} position={[side * (layout.width / 2 - .19), 3.6, z]}><boxGeometry args={[.035, 3.8, .09]} /><meshBasicMaterial color={CLASSIC_RED_THEME.amber} transparent opacity={.42} /></mesh>))}</>
 }
 
 function Room({ layout, interactive, selectedSeatId, onSeatSelect, reclineAngle }: { layout: GeneratedAuditoriumLayout; interactive: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; reclineAngle: number }) {
+  const carpet = useMemo(() => createClassicCarpetTexture(layout.width, layout.depth), [layout.depth, layout.width])
   const resources = useMemo<SeatResources>(() => {
     const base = new THREE.BoxGeometry(.78, .25, .78); const back = new THREE.BoxGeometry(.8, .95, .18); const arm = new THREE.BoxGeometry(.16, .16, .78)
     const material = (color: string, metalness = .08) => new THREE.MeshStandardMaterial({ color, roughness: .58, metalness })
-    return { base, back, arm, materials: { standard: material('#173d7a'), premium: material('#1d4ed8', .15), vip: material('#0e7490', .32), selected: material('#2563eb', .2), held: material('#38bdf8', .2), booked: material('#334155'), disabled: material('#111827'), arm: material(layout.config.style === 'luxury' ? '#1e3a5f' : '#172744', .35) } }
+    return { base, back, arm, materials: { standard: material(CLASSIC_RED_THEME.seats.standard), standardBack: material('#a51d2b'), premium: material(CLASSIC_RED_THEME.seats.premium, .12), premiumBack: material('#c72b3a', .12), vip: material(CLASSIC_RED_THEME.seats.vip, .18), vipBack: material('#8c1726', .18), selected: material('#2563eb', .2), held: material(CLASSIC_RED_THEME.amber, .16), booked: material('#3a3032'), disabled: material('#171113'), arm: material(CLASSIC_RED_THEME.frame, .24) } }
   }, [layout.config.style])
-  useEffect(() => () => { resources.base.dispose(); resources.back.dispose(); resources.arm.dispose(); Object.values(resources.materials).forEach(material => material.dispose()) }, [resources])
-  const wallColor = layout.config.style === 'luxury' ? '#0e1d35' : layout.config.style === 'boutique' ? '#101d36' : '#111d35'
+  useEffect(() => () => { carpet.dispose(); resources.base.dispose(); resources.back.dispose(); resources.arm.dispose(); Object.values(resources.materials).forEach(material => material.dispose()) }, [carpet, resources])
+  const wallColor = layout.config.style === 'luxury' ? CLASSIC_RED_THEME.wallLuxury : CLASSIC_RED_THEME.wall
   return <>
-  <ambientLight intensity={.52} /><hemisphereLight color="#b9d7ff" groundColor="#07101f" intensity={.48} /><spotLight position={[0, 10, layout.config.screen.z + 2]} intensity={72} angle={1.15} penumbra={.95} color="#dbeafe" /><pointLight position={[0, layout.config.screen.y, layout.config.screen.z + 1]} color="#b9d7ff" intensity={9} distance={18} /><pointLight position={[-7, .45, 6]} color="#2563eb" intensity={11} distance={16} /><pointLight position={[8, .45, 6]} color="#38bdf8" intensity={11} distance={16} />
+  <ambientLight intensity={.38} /><hemisphereLight color="#ffe3bd" groundColor="#190305" intensity={.34} /><spotLight position={[0, 10, layout.config.screen.z + 2]} intensity={68} angle={1.15} penumbra={.95} color="#f8e7d0" /><pointLight position={[0, layout.config.screen.y, layout.config.screen.z + 1]} color="#f4e2cd" intensity={8} distance={18} /><pointLight position={[-7, .45, 6]} color={CLASSIC_RED_THEME.amber} intensity={8} distance={15} /><pointLight position={[8, .45, 6]} color={CLASSIC_RED_THEME.amber} intensity={8} distance={15} />
   <mesh position={[0, 2.5, layout.config.screen.z - .25]}><boxGeometry args={[layout.config.screen.width + 4, 7, .3]} /><meshStandardMaterial color="#0b1324" /></mesh><CinematicScreen layout={layout} /><Text position={[0, layout.config.screen.y + layout.config.screen.height / 2 + .55, layout.config.screen.z + .05]} fontSize={.28} color="#38bdf8">CINEVERSE · {layout.config.name.toUpperCase()}</Text>
-  <mesh position={[0, -.2, layout.depth / 2 + layout.config.screen.z]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[layout.width + 5, layout.depth + 8]} /><meshStandardMaterial color="#0b1424" roughness={.78} metalness={.08} /></mesh>
-  <TierArchitecture layout={layout} />
+  <mesh position={[0, -.2, layout.depth / 2 + layout.config.screen.z]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[layout.width + 5, layout.depth + 8]} /><meshStandardMaterial map={carpet} color="#ffffff" roughness={.94} metalness={0} /></mesh>
+  <TierArchitecture layout={layout} carpet={carpet} />
   {layout.seats.map(seat => <CinemaSeat key={seat.id} seat={seat} resources={resources} scale={layout.config.seatScale} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle} />)}
-  <mesh position={[-layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} /></mesh><mesh position={[layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} /></mesh>
+  <mesh position={[-layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} roughness={.88} /></mesh><mesh position={[layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} roughness={.88} /></mesh><mesh position={[0, 7.85, layout.depth / 2 + layout.config.screen.z]} rotation={[Math.PI/2,0,0]}><planeGeometry args={[layout.width + .5, layout.depth + 6]} /><meshStandardMaterial color={CLASSIC_RED_THEME.ceiling} roughness={.95} side={THREE.DoubleSide} /></mesh><WallAccents layout={layout} />
   </> }
 
 export function AuditoriumScene({ layout, mode, focusedSeat, interactive = true, selectedSeatId, onSeatSelect, seatView = DEFAULT_SEAT_VIEW, showSightline = false, resetViewVersion = 0 }: { layout: GeneratedAuditoriumLayout; mode: CameraMode; focusedSeat: Seat | null; interactive?: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; seatView?: SeatViewCalibration; showSightline?: boolean; resetViewVersion?: number }) {
