@@ -8,6 +8,7 @@ import { useBookingStore } from '../../../stores/bookingStore'
 import { DEFAULT_SEAT_VIEW, getLookAtQuaternion, getModePose, getSeatWorldPosition, type CameraMode, type SeatViewCalibration } from '../utils/camera'
 import type { GeneratedAuditoriumLayout } from '../utils/layoutEngine'
 import { calculateSightline, getSightlineVisibility } from '../utils/sightline'
+import { clampCameraTarget, createCameraSafetyBounds, getSafeOverviewPose, isValidOverviewPosition, ORBIT_LIMITS, resolveCameraPosition, type CameraSafetyBounds } from '../utils/cameraSafety'
 
 export type { CameraMode } from '../utils/camera'
 const stateColors = { available: '#173d7a', selected: '#2563eb', held: '#38bdf8', booked: '#334155', disabled: '#111827' }
@@ -47,20 +48,23 @@ function SightlineVisualization({ seat, screenCenter, seatView, mode, enabled }:
   </group>
 }
 
-function CameraController({ mode, seat, screenCenter, overviewTarget, overviewPosition, controls, seatView }: { mode: CameraMode; seat: Seat | null; screenCenter: THREE.Vector3; overviewTarget: THREE.Vector3; overviewPosition: THREE.Vector3; controls: React.RefObject<OrbitControlsImpl | null>; seatView: SeatViewCalibration }) {
+function CameraController({ mode, seat, screenCenter, overviewTarget, overviewPosition, controls, seatView, resetVersion }: { mode: CameraMode; seat: Seat | null; screenCenter: THREE.Vector3; overviewTarget: THREE.Vector3; overviewPosition: THREE.Vector3; controls: React.RefObject<OrbitControlsImpl | null>; seatView: SeatViewCalibration; resetVersion: number }) {
   const { camera } = useThree()
   const previousMode = useRef<CameraMode>('overview')
   const savedOverview = useRef<SavedCamera | null>(null)
   const targetPosition = useRef(new THREE.Vector3())
   const targetQuaternion = useRef(new THREE.Quaternion())
   const transitionActive = useRef(false)
+  const previousResetVersion = useRef(resetVersion)
 
   useEffect(() => {
+    const resetRequested = previousResetVersion.current !== resetVersion
+    if (resetRequested) savedOverview.current = null
     if (previousMode.current === 'overview' && mode !== 'overview') {
       savedOverview.current = { position: camera.position.clone(), quaternion: camera.quaternion.clone(), target: controls.current?.target.clone() ?? overviewTarget.clone(), fov: (camera as THREE.PerspectiveCamera).fov }
     }
     if (mode === 'overview') {
-      const saved = savedOverview.current
+      const saved = resetRequested ? null : savedOverview.current
       if (saved) {
         targetPosition.current.copy(saved.position); targetQuaternion.current.copy(saved.quaternion)
         ;(camera as THREE.PerspectiveCamera).fov = saved.fov; (camera as THREE.PerspectiveCamera).updateProjectionMatrix()
@@ -72,8 +76,8 @@ function CameraController({ mode, seat, screenCenter, overviewTarget, overviewPo
       targetPosition.current.copy(pose.position); targetQuaternion.current.copy(pose.quaternion)
     }
     if (controls.current) controls.current.enabled = false
-    transitionActive.current = true; previousMode.current = mode
-  }, [camera, controls, mode, overviewPosition, overviewTarget, screenCenter, seat, seatView])
+    transitionActive.current = true; previousMode.current = mode; previousResetVersion.current = resetVersion
+  }, [camera, controls, mode, overviewPosition, overviewTarget, resetVersion, screenCenter, seat, seatView])
 
   useFrame((_, delta) => {
     if (!transitionActive.current) return
@@ -85,6 +89,32 @@ function CameraController({ mode, seat, screenCenter, overviewTarget, overviewPo
       camera.position.copy(targetPosition.current); camera.quaternion.copy(targetQuaternion.current); transitionActive.current = false
       if (mode === 'overview' && controls.current) { controls.current.target.copy(savedOverview.current?.target ?? overviewTarget); controls.current.enabled = true; controls.current.update() }
     }
+  })
+  return null
+}
+
+function CameraSafetyController({ mode, bounds, controls }: { mode: CameraMode; bounds: CameraSafetyBounds; controls: React.RefObject<OrbitControlsImpl | null> }) {
+  const { camera } = useThree()
+  const resetPose = useMemo(() => getSafeOverviewPose(bounds), [bounds])
+  const lastPosition = useRef(resetPose.position.clone()); const lastTarget = useRef(resetPose.target.clone())
+  const proposed = useRef(new THREE.Vector3()); const resolved = useRef(new THREE.Vector3()); const clampedTarget = useRef(new THREE.Vector3())
+  useEffect(() => { lastPosition.current.copy(resetPose.position); lastTarget.current.copy(resetPose.target) }, [resetPose])
+  useFrame(() => {
+    const orbit = controls.current
+    if (mode !== 'overview' || !orbit?.enabled) return
+    clampCameraTarget(bounds, orbit.target, clampedTarget.current)
+    if (clampedTarget.current.distanceToSquared(orbit.target) > 1e-8) {
+      proposed.current.copy(camera.position).add(clampedTarget.current).sub(orbit.target)
+      orbit.target.copy(clampedTarget.current); resolveCameraPosition(bounds, lastPosition.current, proposed.current, resolved.current); camera.position.copy(resolved.current)
+    }
+    const offset = proposed.current.copy(camera.position).sub(orbit.target)
+    if (offset.length() > bounds.maxDistance) camera.position.copy(orbit.target).add(offset.setLength(bounds.maxDistance))
+    if (!isValidOverviewPosition(bounds, camera.position)) {
+      resolveCameraPosition(bounds, lastPosition.current, camera.position, resolved.current)
+      camera.position.copy(resolved.current); orbit.target.copy(clampCameraTarget(bounds, orbit.target, clampedTarget.current)); orbit.update()
+    }
+    if (isValidOverviewPosition(bounds, camera.position)) { lastPosition.current.copy(camera.position); lastTarget.current.copy(orbit.target) }
+    else { camera.position.copy(lastPosition.current); orbit.target.copy(lastTarget.current); orbit.update() }
   })
   return null
 }
@@ -127,18 +157,18 @@ function Room({ layout, interactive, selectedSeatId, onSeatSelect, reclineAngle 
   useEffect(() => () => { resources.base.dispose(); resources.back.dispose(); resources.arm.dispose(); Object.values(resources.materials).forEach(material => material.dispose()) }, [resources])
   const wallColor = layout.config.style === 'luxury' ? '#0e1d35' : layout.config.style === 'boutique' ? '#101d36' : '#111d35'
   return <>
-  <ambientLight intensity={.42} /><spotLight position={[0, 11, -3]} intensity={60} angle={1.2} penumbra={.9} /><pointLight position={[-7, .4, 6]} color="#2563eb" intensity={12} /><pointLight position={[8, .4, 6]} color="#38bdf8" intensity={12} />
+  <ambientLight intensity={.52} /><hemisphereLight color="#b9d7ff" groundColor="#07101f" intensity={.48} /><spotLight position={[0, 10, layout.config.screen.z + 2]} intensity={72} angle={1.15} penumbra={.95} color="#dbeafe" /><pointLight position={[0, layout.config.screen.y, layout.config.screen.z + 1]} color="#b9d7ff" intensity={9} distance={18} /><pointLight position={[-7, .45, 6]} color="#2563eb" intensity={11} distance={16} /><pointLight position={[8, .45, 6]} color="#38bdf8" intensity={11} distance={16} />
   <mesh position={[0, 2.5, layout.config.screen.z - .25]}><boxGeometry args={[layout.config.screen.width + 4, 7, .3]} /><meshStandardMaterial color="#0b1324" /></mesh><CinematicScreen layout={layout} /><Text position={[0, layout.config.screen.y + layout.config.screen.height / 2 + .55, layout.config.screen.z + .05]} fontSize={.28} color="#38bdf8">CINEVERSE · {layout.config.name.toUpperCase()}</Text>
-  <mesh position={[0, -.2, layout.depth / 2 + layout.config.screen.z]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[layout.width + 5, layout.depth + 8]} /><meshStandardMaterial color="#0d0e12" roughness={.85} /></mesh>
+  <mesh position={[0, -.2, layout.depth / 2 + layout.config.screen.z]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[layout.width + 5, layout.depth + 8]} /><meshStandardMaterial color="#0b1424" roughness={.78} metalness={.08} /></mesh>
   <TierArchitecture layout={layout} />
   {layout.seats.map(seat => <CinemaSeat key={seat.id} seat={seat} resources={resources} scale={layout.config.seatScale} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle} />)}
   <mesh position={[-layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} /></mesh><mesh position={[layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} /></mesh>
   </> }
 
-export function AuditoriumScene({ layout, mode, focusedSeat, interactive = true, selectedSeatId, onSeatSelect, seatView = DEFAULT_SEAT_VIEW, showSightline = false }: { layout: GeneratedAuditoriumLayout; mode: CameraMode; focusedSeat: Seat | null; interactive?: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; seatView?: SeatViewCalibration; showSightline?: boolean }) {
+export function AuditoriumScene({ layout, mode, focusedSeat, interactive = true, selectedSeatId, onSeatSelect, seatView = DEFAULT_SEAT_VIEW, showSightline = false, resetViewVersion = 0 }: { layout: GeneratedAuditoriumLayout; mode: CameraMode; focusedSeat: Seat | null; interactive?: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; seatView?: SeatViewCalibration; showSightline?: boolean; resetViewVersion?: number }) {
   const controls = useRef<OrbitControlsImpl>(null)
   const screenCenter = useMemo(() => new THREE.Vector3(0, layout.config.screen.y, layout.config.screen.z), [layout.config.screen.y, layout.config.screen.z])
-  const overviewTarget = useMemo(() => new THREE.Vector3(0, 2, Math.max(3, layout.config.rows * layout.config.rowSpacing * .45)), [layout.config.rowSpacing, layout.config.rows])
-  const overviewPosition = useMemo(() => new THREE.Vector3(0, Math.max(10, layout.config.rows), Math.max(18, layout.depth * .7)), [layout.config.rows, layout.depth])
-  return <Canvas camera={{ position: overviewPosition, fov: 48 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}><color attach="background" args={['#080f20']} /><fog attach="fog" args={['#080f20', layout.depth * .7, layout.depth * 1.8]} /><Suspense fallback={<Html center><span className="text-sm text-white">Preparing auditorium…</span></Html>}><Room layout={layout} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={seatView.reclineAngle} /><SightlineVisualization seat={focusedSeat} screenCenter={screenCenter} seatView={seatView} mode={mode} enabled={showSightline} /></Suspense><CameraController key={layout.config.revision} mode={mode} seat={focusedSeat} screenCenter={screenCenter} overviewTarget={overviewTarget} overviewPosition={overviewPosition} controls={controls} seatView={seatView} /><OrbitControls ref={controls} enablePan minDistance={8} maxDistance={Math.max(32, layout.depth)} minPolarAngle={.3} maxPolarAngle={1.48} target={overviewTarget} /></Canvas>
+  const safetyBounds = useMemo(() => createCameraSafetyBounds(layout), [layout])
+  const overview = useMemo(() => getSafeOverviewPose(safetyBounds), [safetyBounds])
+  return <Canvas camera={{ position: overview.position, fov: 48 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}><color attach="background" args={['#080f20']} /><fog attach="fog" args={['#080f20', layout.depth * .7, layout.depth * 1.8]} /><Suspense fallback={<Html center><span className="text-sm text-white">Preparing auditorium…</span></Html>}><Room layout={layout} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={seatView.reclineAngle} /><SightlineVisualization seat={focusedSeat} screenCenter={screenCenter} seatView={seatView} mode={mode} enabled={showSightline} /></Suspense><CameraController key={layout.config.revision} mode={mode} seat={focusedSeat} screenCenter={screenCenter} overviewTarget={overview.target} overviewPosition={overview.position} controls={controls} seatView={seatView} resetVersion={resetViewVersion} /><CameraSafetyController mode={mode} bounds={safetyBounds} controls={controls} /><OrbitControls ref={controls} enablePan enableDamping dampingFactor={.08} minDistance={ORBIT_LIMITS.minDistance} maxDistance={safetyBounds.maxDistance} minPolarAngle={ORBIT_LIMITS.minPolarAngle} maxPolarAngle={ORBIT_LIMITS.maxPolarAngle} screenSpacePanning={false} target={overview.target} /></Canvas>
 }
