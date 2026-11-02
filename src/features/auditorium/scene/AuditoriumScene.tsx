@@ -10,6 +10,8 @@ import { calculateSightline, getSightlineVisibility } from '../utils/sightline'
 import { createCameraSafetyBounds, getSafeOverviewPose } from '../utils/cameraSafety'
 import { CinematicCameraController } from './CinematicCameraController'
 import { CLASSIC_RED_THEME, createClassicCarpetTexture } from '../utils/auditoriumTheme'
+import { RealisticCinemaSeat } from './RealisticCinemaSeat'
+import { SeatAssetBoundary } from './SeatAssetBoundary'
 
 export type { CameraMode } from '../utils/camera'
 interface SeatResources { base: THREE.BoxGeometry; back: THREE.BoxGeometry; arm: THREE.BoxGeometry; materials: Record<string, THREE.MeshStandardMaterial> }
@@ -90,12 +92,14 @@ function Room({ layout, interactive, selectedSeatId, onSeatSelect, reclineAngle 
   }, [layout.config.style])
   useEffect(() => () => { carpet.dispose(); resources.base.dispose(); resources.back.dispose(); resources.arm.dispose(); Object.values(resources.materials).forEach(material => material.dispose()) }, [carpet, resources])
   const wallColor = layout.config.style === 'luxury' ? CLASSIC_RED_THEME.wallLuxury : CLASSIC_RED_THEME.wall
+  const prototypeSeatId = useMemo(() => layout.seats.find(seat => seat.rowIndex === 0 && seat.section === 'center')?.id ?? layout.seats[0]?.id, [layout.seats])
+  const proceduralSeat = (seat: Seat) => <CinemaSeat seat={seat} resources={resources} scale={layout.config.seatScale} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle} />
   return <>
   <ambientLight intensity={.38} /><hemisphereLight color="#ffe3bd" groundColor="#190305" intensity={.34} /><spotLight position={[0, 10, layout.config.screen.z + 2]} intensity={68} angle={1.15} penumbra={.95} color="#f8e7d0" /><pointLight position={[0, layout.config.screen.y, layout.config.screen.z + 1]} color="#f4e2cd" intensity={8} distance={18} /><pointLight position={[-7, .45, 6]} color={CLASSIC_RED_THEME.amber} intensity={8} distance={15} /><pointLight position={[8, .45, 6]} color={CLASSIC_RED_THEME.amber} intensity={8} distance={15} />
   <mesh position={[0, 2.5, layout.config.screen.z - .25]}><boxGeometry args={[layout.config.screen.width + 4, 7, .3]} /><meshStandardMaterial color="#0b1324" /></mesh><CinematicScreen layout={layout} /><Text position={[0, layout.config.screen.y + layout.config.screen.height / 2 + .55, layout.config.screen.z + .05]} fontSize={.28} color="#38bdf8">CINEVERSE · {layout.config.name.toUpperCase()}</Text>
   <mesh position={[0, -.2, layout.depth / 2 + layout.config.screen.z]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[layout.width + 5, layout.depth + 8]} /><meshStandardMaterial map={carpet} color="#ffffff" roughness={.94} metalness={0} /></mesh>
   <TierArchitecture layout={layout} carpet={carpet} />
-  {layout.seats.map(seat => <CinemaSeat key={seat.id} seat={seat} resources={resources} scale={layout.config.seatScale} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle} />)}
+  {layout.seats.map(seat => seat.id === prototypeSeatId ? <SeatAssetBoundary key={seat.id} fallback={proceduralSeat(seat)}><Suspense fallback={proceduralSeat(seat)}><RealisticCinemaSeat seat={seat} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle}/></Suspense></SeatAssetBoundary> : <CinemaSeat key={seat.id} seat={seat} resources={resources} scale={layout.config.seatScale} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle} />)}
   <mesh position={[-layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} roughness={.88} /></mesh><mesh position={[layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} roughness={.88} /></mesh><mesh position={[0, 7.85, layout.depth / 2 + layout.config.screen.z]} rotation={[Math.PI/2,0,0]}><planeGeometry args={[layout.width + .5, layout.depth + 6]} /><meshStandardMaterial color={CLASSIC_RED_THEME.ceiling} roughness={.95} side={THREE.DoubleSide} /></mesh><WallAccents layout={layout} />
   </> }
 
