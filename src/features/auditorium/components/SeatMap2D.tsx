@@ -1,7 +1,8 @@
 import type { Seat } from '../../../types/domain'
 import { useBookingStore } from '../../../stores/bookingStore'
 
-const colors = { available: 'bg-blue-950 border-blue-700', selected: 'bg-accent border-cyan', held: 'bg-cyan/50 border-cyan', booked: 'bg-slate-700 border-slate-600', disabled: 'bg-transparent border-slate-800' }
+const categoryColors = { standard: 'bg-[#8F1824] border-[#C43A48]', premium: 'bg-[#B42332] border-[#E05763]', vip: 'bg-[#73121F] border-[#A52B3A]' }
+const statusColors = { selected: 'bg-[#2563EB] border-[#60A5FA]', held: 'bg-[#F59E0B]/70 border-[#FBBF24]', booked: 'bg-[#3A3032] border-[#65575A]', disabled: 'bg-[#171113] border-[#3A3032]' }
 export function SeatMap2D({ seats, selectedSeatId, onSeatSelect }: { seats: Seat[]; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void }) {
   const selected = useBookingStore(state => state.selectedSeats)
   const toggle = useBookingStore(state => state.toggleSeat)
@@ -13,7 +14,8 @@ export function SeatMap2D({ seats, selectedSeatId, onSeatSelect }: { seats: Seat
       const previous = rowSeats[index - 1]
       const beginsSection = previous && previous.section !== seat.section
       const isSelected = selectedSeatId ? selectedSeatId === seat.id : selected.some(item => item.id === seat.id)
-      return <button key={seat.id} onClick={() => onSeatSelect ? onSeatSelect(seat) : toggle(seat)} disabled={!onSeatSelect && seat.status !== 'available' && !isSelected} aria-label={`Seat ${seat.id}, ${seat.section} section, ${isSelected ? 'selected' : seat.status}, $${seat.price}`} title={`${seat.id} · ${seat.section} · ${seat.category}`} className={`size-7 rounded-t-lg border text-[9px] transition hover:-translate-y-1 ${beginsSection ? 'ml-6' : ''} ${isSelected ? colors.selected : colors[seat.status]}`} style={{ transform: `rotate(${seat.rotation * 18}deg)` }}>{seat.number}</button>
+      const color = isSelected ? statusColors.selected : seat.status === 'available' ? categoryColors[seat.category] : statusColors[seat.status]
+      return <button key={seat.id} onClick={() => onSeatSelect ? onSeatSelect(seat) : toggle(seat)} disabled={!onSeatSelect && seat.status !== 'available' && !isSelected} aria-label={`Seat ${seat.id}, ${seat.section} section, ${isSelected ? 'selected' : seat.status}, $${seat.price}`} title={`${seat.id} · ${seat.section} · ${seat.category}`} className={`size-7 rounded-t-lg border text-[9px] text-white transition hover:-translate-y-1 ${beginsSection ? 'ml-6' : ''} ${color}`} style={{ transform: `rotate(${seat.rotation * 18}deg)` }}>{seat.number}</button>
     })}</div>
   })}</div></div></div>
 }
