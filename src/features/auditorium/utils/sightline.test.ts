@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import type { Seat } from '../../../types/domain'
 import { DEFAULT_SEAT_VIEW } from './camera'
-import { calculateSightline, getSightlineVisibility } from './sightline'
+import { calculateSightline, createViewingBeamData, getFlatScreenBoundary, getSightlineVisibility } from './sightline'
 
 const seat: Seat = { id:'A1', row:'A', rowIndex:0, number:1, section:'center', sectionIndex:0, category:'standard', status:'available', price:10, x:0, y:.2, z:0, rotation:0 }
 const screen = new THREE.Vector3(0, 2.5, -7)
@@ -26,6 +26,31 @@ describe('sightline world geometry', () => {
     const upright = calculateSightline(seat, screen, DEFAULT_SEAT_VIEW)
     const reclined = calculateSightline(seat, screen, { ...DEFAULT_SEAT_VIEW, reclineAngle: 35, panTranslation: .2 })
     expect(upright.origin.distanceTo(reclined.origin)).toBeGreaterThan(.1)
+  })
+})
+
+describe('geometric viewing beam', () => {
+  it('uses the actual four screen corners as its base', () => {
+    const boundary = getFlatScreenBoundary(screen, 8, 3.5)
+    expect(boundary[0].toArray()).toEqual([-4, 4.25, -7])
+    expect(boundary[2].toArray()).toEqual([4, .75, -7])
+
+    const origin = calculateSightline(seat, screen, DEFAULT_SEAT_VIEW).origin
+    const beam = createViewingBeamData(origin, boundary)
+    expect(beam.surfacePositions).toHaveLength(36)
+    expect(beam.edgePositions).toHaveLength(48)
+    expect(Array.from(beam.surfacePositions.slice(0, 3))).toEqual(origin.toArray())
+  })
+
+  it('supports subdivided boundaries for curved screens', () => {
+    const boundary = [...getFlatScreenBoundary(screen, 8, 3.5), new THREE.Vector3(-4.2, 2.5, -6.8)]
+    const beam = createViewingBeamData(new THREE.Vector3(), boundary)
+    expect(beam.surfacePositions).toHaveLength(boundary.length * 9)
+    expect(beam.edgePositions).toHaveLength(boundary.length * 12)
+  })
+
+  it('rejects an incomplete screen boundary', () => {
+    expect(() => createViewingBeamData(new THREE.Vector3(), [screen, screen])).toThrow(/at least three/)
   })
 })
 

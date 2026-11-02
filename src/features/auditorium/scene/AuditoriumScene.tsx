@@ -6,7 +6,7 @@ import type { Seat } from '../../../types/domain'
 import { useBookingStore } from '../../../stores/bookingStore'
 import { DEFAULT_SEAT_VIEW, getSeatWorldPosition, type CameraMode, type SeatViewCalibration } from '../utils/camera'
 import type { GeneratedAuditoriumLayout } from '../utils/layoutEngine'
-import { calculateSightline, getSightlineVisibility } from '../utils/sightline'
+import { calculateSightline, createViewingBeamData, getFlatScreenBoundary, getSightlineVisibility } from '../utils/sightline'
 import { createCameraSafetyBounds, getSafeOverviewPose } from '../utils/cameraSafety'
 import { CinematicCameraController } from './CinematicCameraController'
 import { CLASSIC_RED_THEME, createClassicCarpetTexture } from '../utils/auditoriumTheme'
@@ -36,14 +36,23 @@ function CinemaSeat({ seat, resources, scale, interactive, selectedSeatId, onSea
   </group>
 }
 
-function SightlineVisualization({ seat, screenCenter, seatView, mode, enabled }: { seat: Seat | null; screenCenter: THREE.Vector3; seatView: SeatViewCalibration; mode: CameraMode; enabled: boolean }) {
+function SightlineVisualization({ seat, screenCenter, screenBoundary, seatView, mode, enabled }: { seat: Seat | null; screenCenter: THREE.Vector3; screenBoundary: readonly THREE.Vector3[]; seatView: SeatViewCalibration; mode: CameraMode; enabled: boolean }) {
   const visibility = getSightlineVisibility(enabled, !!seat, mode)
   const measurement = useMemo(() => seat ? calculateSightline(seat, screenCenter, seatView) : null, [screenCenter, seat, seatView])
-  const geometry = useMemo(() => measurement ? new THREE.BufferGeometry().setFromPoints([measurement.origin, measurement.target]) : null, [measurement])
-  useEffect(() => () => geometry?.dispose(), [geometry])
+  const surfaceGeometry = useMemo(() => new THREE.BufferGeometry(), [])
+  const edgeGeometry = useMemo(() => new THREE.BufferGeometry(), [])
+  useLayoutEffect(() => {
+    if (!measurement) return
+    const beam = createViewingBeamData(measurement.origin, screenBoundary)
+    surfaceGeometry.setAttribute('position', new THREE.BufferAttribute(beam.surfacePositions, 3))
+    edgeGeometry.setAttribute('position', new THREE.BufferAttribute(beam.edgePositions, 3))
+    surfaceGeometry.computeBoundingSphere()
+    edgeGeometry.computeBoundingSphere()
+  }, [edgeGeometry, measurement, screenBoundary, surfaceGeometry])
+  useEffect(() => () => { surfaceGeometry.dispose(); edgeGeometry.dispose() }, [edgeGeometry, surfaceGeometry])
   if (!visibility.visible || !measurement) return null
   return <group raycast={() => undefined}>
-    {visibility.showBeam && geometry && <lineSegments geometry={geometry} raycast={() => undefined}><lineBasicMaterial color="#FACC15" transparent opacity={.9} blending={THREE.AdditiveBlending} depthWrite={false} /></lineSegments>}
+    {visibility.showBeam && <><mesh geometry={surfaceGeometry} renderOrder={3} raycast={() => undefined}><meshBasicMaterial color="#FACC15" transparent opacity={.075} side={THREE.DoubleSide} depthWrite={false} depthTest blending={THREE.NormalBlending} /></mesh><lineSegments geometry={edgeGeometry} renderOrder={4} raycast={() => undefined}><lineBasicMaterial color="#FACC15" transparent opacity={.48} blending={THREE.AdditiveBlending} depthWrite={false} depthTest /></lineSegments></>}
     {visibility.showEyeMarker && <mesh position={measurement.origin} raycast={() => undefined}><sphereGeometry args={[.085, 12, 12]} /><meshBasicMaterial color="#FACC15" transparent opacity={.9} depthWrite={false} /></mesh>}
     {visibility.showScreenMarker && <mesh position={[measurement.target.x, measurement.target.y, measurement.target.z + .035]} raycast={() => undefined}><ringGeometry args={[.12, .19, 24]} /><meshBasicMaterial color="#FACC15" transparent opacity={.85} side={THREE.DoubleSide} depthWrite={false} /></mesh>}
   </group>
@@ -105,7 +114,8 @@ function Room({ layout, interactive, selectedSeatId, onSeatSelect, reclineAngle 
 
 export function AuditoriumScene({ layout, mode, focusedSeat, interactive = true, selectedSeatId, onSeatSelect, seatView = DEFAULT_SEAT_VIEW, showSightline = false, resetViewVersion = 0 }: { layout: GeneratedAuditoriumLayout; mode: CameraMode; focusedSeat: Seat | null; interactive?: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; seatView?: SeatViewCalibration; showSightline?: boolean; resetViewVersion?: number }) {
   const screenCenter = useMemo(() => new THREE.Vector3(0, layout.config.screen.y, layout.config.screen.z), [layout.config.screen.y, layout.config.screen.z])
+  const screenBoundary = useMemo(() => getFlatScreenBoundary(screenCenter, layout.config.screen.width, layout.config.screen.height), [layout.config.screen.height, layout.config.screen.width, screenCenter])
   const safetyBounds = useMemo(() => createCameraSafetyBounds(layout), [layout])
   const overview = useMemo(() => getSafeOverviewPose(safetyBounds), [safetyBounds])
-  return <Canvas camera={{ position: overview.position, fov: 48 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}><color attach="background" args={['#080f20']} /><fog attach="fog" args={['#080f20', layout.depth * .7, layout.depth * 1.8]} /><Suspense fallback={<Html center><span className="text-sm text-white">Preparing auditorium…</span></Html>}><Room layout={layout} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={seatView.reclineAngle} /><SightlineVisualization seat={focusedSeat} screenCenter={screenCenter} seatView={seatView} mode={mode} enabled={showSightline} /></Suspense><CinematicCameraController key={layout.config.revision} mode={mode} seat={focusedSeat} screenCenter={screenCenter} bounds={safetyBounds} seatView={seatView} resetVersion={resetViewVersion} /></Canvas>
+  return <Canvas camera={{ position: overview.position, fov: 48 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}><color attach="background" args={['#080f20']} /><fog attach="fog" args={['#080f20', layout.depth * .7, layout.depth * 1.8]} /><Suspense fallback={<Html center><span className="text-sm text-white">Preparing auditorium…</span></Html>}><Room layout={layout} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={seatView.reclineAngle} /><SightlineVisualization seat={focusedSeat} screenCenter={screenCenter} screenBoundary={screenBoundary} seatView={seatView} mode={mode} enabled={showSightline} /></Suspense><CinematicCameraController key={layout.config.revision} mode={mode} seat={focusedSeat} screenCenter={screenCenter} bounds={safetyBounds} seatView={seatView} resetVersion={resetViewVersion} /></Canvas>
 }

@@ -87,5 +87,5 @@ export default function BookingPage() {
 
 function SightlineMetrics({ sightline }: { sightline: SightlineMeasurement }) {
   const signed = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}°`
-  return <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[#FACC15]" aria-label="Sightline measurements"><span>{sightline.distance.toFixed(1)}m</span><span>H {signed(sightline.horizontalAngle)}</span><span>V {signed(sightline.verticalAngle)}</span></div>
+  return <div className="mt-2 text-[10px] text-[#FACC15]" aria-label="Geometric viewing beam measurements"><div className="flex flex-wrap gap-x-3 gap-y-1"><span>{sightline.distance.toFixed(1)}m</span><span>H {signed(sightline.horizontalAngle)}</span><span>V {signed(sightline.verticalAngle)}</span></div><p className="mt-1 text-[9px] text-[#FACC15]/70">Geometric coverage · obstructions not evaluated</p></div>
 }
