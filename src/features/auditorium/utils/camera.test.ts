@@ -15,7 +15,7 @@ describe('seat world coordinates', () => {
     expect(world.z).toBe(f12.z)
     expect(world.y).toBeCloseTo(getPlatformTop(f12) - .125)
     expect(eye.y - world.y).toBeCloseTo(SEATED_EYE_HEIGHT)
-    expect(eye.z).toBeCloseTo(f12.z + .16)
+    expect(eye.z).toBeCloseTo(f12.z - .16)
   })
 
   it('raises back-row eye positions above middle and front rows', () => {

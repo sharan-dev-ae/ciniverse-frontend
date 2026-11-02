@@ -3,15 +3,15 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background: #08090d; color: #f8fafc; }
+:root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background: #080f20; color: #eaf2ff; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: #08090d; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: #080f20; }
 button, a, input, select { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #fb365c; outline-offset: 3px; }
-.glass { background: rgba(17,19,25,.82); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.08); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+.glass { background: rgba(17,29,53,.84); backdrop-filter: blur(20px); border: 1px solid rgba(148,163,184,.14); }
 .cinema-grain::after { content: ''; pointer-events: none; position: fixed; inset: 0; opacity: .025; z-index: 50; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E"); }
 .text-balance { text-wrap: balance; }
-.field { margin-top: .5rem; height: 2.75rem; width: 100%; border-radius: .75rem; border: 1px solid #292d36; background: #08090d; padding: 0 .75rem; color: white; outline: none; }
-.field:focus { border-color: #e11d48; }
+.field { margin-top: .5rem; height: 2.75rem; width: 100%; border-radius: .75rem; border: 1px solid #294064; background: #080f20; padding: 0 .75rem; color: #eaf2ff; outline: none; }
+.field:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.12); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }

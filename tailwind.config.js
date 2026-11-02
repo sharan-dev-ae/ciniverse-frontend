@@ -4,9 +4,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#08090D', panel: '#111319', elevated: '#191B23',
-        accent: '#E11D48', 'accent-hover': '#FB365C', gold: '#D6AD60',
-        muted: '#9CA3AF', line: '#292D36',
+        ink: '#080F20', panel: '#111D35', elevated: '#172744',
+        accent: '#2563EB', 'accent-hover': '#1D4ED8', gold: '#38BDF8', cyan: '#38BDF8',
+        muted: '#94A3B8', line: '#294064',
       },
       fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
     },

@@ -18,7 +18,7 @@ export function generateSeats(rows = 10, seatsPerRow = 12, centralAisle = true):
     for (let n = 1; n <= seatsPerRow; n += 1) {
       const index = r * seatsPerRow + n - 1
       const gap = centralAisle && n > seatsPerRow / 2 ? 1.7 : 0
-      seats.push({ id: `${row}${n}`, row, number: n, category, status: seededStatus(index), price: CATEGORY_PRICES[category], x: (n - (seatsPerRow + 1) / 2) * 1.25 + gap, z: r * 1.45 })
+      seats.push({ id: `${row}${n}`, row, rowIndex: r, number: n, section: centralAisle ? (n <= seatsPerRow / 2 ? 'left' : 'right') : 'center', sectionIndex: centralAisle ? (n <= seatsPerRow / 2 ? 0 : 1) : 0, category, status: seededStatus(index), price: CATEGORY_PRICES[category], x: (n - (seatsPerRow + 1) / 2) * 1.25 + gap, y: .175 + r * .18, z: r * 1.45, rotation: 0 })
     }
   }
   return seats
