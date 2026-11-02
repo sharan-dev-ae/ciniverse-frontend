@@ -16,5 +16,6 @@ export function validateStudio(project: StudioProject): StudioValidation {
   if (project.config.rowRise / project.config.rowSpacing > .28) warnings.push('Tier slope is steep; verify sightlines and local code requirements.')
   if (project.references.some(reference => !reference.calibrated)) warnings.push('Reference assets require manual scale calibration before measurement use.')
   if (project.config.screen.width > project.room.width * .82) warnings.push('Screen occupies more than 82% of room width.')
+  if (project.config.stage.enabled && project.config.stage.width > project.room.width - 1) blocking.push('Stage width must leave at least 0.5m side clearance.')
   return { blocking: [...new Set(blocking)], warnings: [...new Set(warnings)] }
 }

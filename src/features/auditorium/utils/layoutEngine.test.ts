@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { getSeatViewPose } from './camera'
-import { generateAuditoriumLayout, generatePresetLayout, getAuditoriumPreset, PRESET_ORDER, validateLayoutConfig } from './layoutEngine'
+import { generateAuditoriumLayout, generatePresetLayout, getAuditoriumPreset, normalizeLayoutConfig, PRESET_ORDER, validateLayoutConfig } from './layoutEngine'
 
 const expectedCounts = { classic: 144, vip: 48, grand: 264, boutique: 42 }
 
@@ -38,6 +38,15 @@ describe('auditorium presets', () => {
     const last = layout.seats.find(seat => seat.rowIndex === layout.config.rows - 1)!
     expect(last.y).toBeGreaterThan(first.y)
     expect(layout.platforms.at(-1)!.y).toBeGreaterThan(layout.platforms[0].y)
+  })
+
+  it.each(PRESET_ORDER)('%s has an elevated screen and a stage with front-row clearance', preset => {
+    const layout = generatePresetLayout(preset)
+    expect(layout.config.screen.bottomElevation).toBeCloseTo(1.5)
+    expect(layout.config.screen.y).toBeCloseTo(layout.config.screen.bottomElevation + layout.config.screen.height / 2)
+    expect(layout.config.stage.enabled).toBe(true)
+    expect(layout.config.screen.z + .45 + layout.config.stage.depth).toBeLessThan(layout.seats[0].z)
+    expect(layout.config.stage.type).toBe(preset === 'grand' ? 'grand' : 'multiplex')
   })
 })
 
@@ -84,6 +93,23 @@ describe('custom layout validation and revisions', () => {
   it('changes the custom revision when geometry changes', () => {
     const first = getAuditoriumPreset('classic'); first.preset = 'custom'
     const second = getAuditoriumPreset('classic'); second.preset = 'custom'; second.aisleWidth += .2
+    expect(generateAuditoriumLayout(first).config.revision).not.toBe(generateAuditoriumLayout(second).config.revision)
+  })
+
+  it('migrates a saved layout without stage metadata to safe elevated defaults', () => {
+    const legacy = getAuditoriumPreset('classic')
+    legacy.screen.y = 2.8
+    delete (legacy.screen as Partial<typeof legacy.screen>).bottomElevation
+    delete (legacy as Partial<typeof legacy>).stage
+    const migrated = normalizeLayoutConfig(legacy)
+    expect(migrated.screen.y).toBeCloseTo(3.9)
+    expect(migrated.screen.bottomElevation).toBeCloseTo(1.5)
+    expect(migrated.stage.type).toBe('multiplex')
+  })
+
+  it('changes the custom revision when stage geometry changes', () => {
+    const first = getAuditoriumPreset('classic'); first.preset = 'custom'
+    const second = getAuditoriumPreset('classic'); second.preset = 'custom'; second.stage.depth += .4
     expect(generateAuditoriumLayout(first).config.revision).not.toBe(generateAuditoriumLayout(second).config.revision)
   })
 })

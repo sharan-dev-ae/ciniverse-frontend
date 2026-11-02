@@ -13,13 +13,14 @@ export interface Movie {
 }
 export interface Cinema { id: string; name: string; location: string; formats: string[] }
 export interface AuditoriumSectionConfig { id: string; label: string; seats: number }
-export interface AuditoriumScreenConfig { width: number; height: number; y: number; z: number }
+export interface AuditoriumScreenConfig { width: number; height: number; bottomElevation: number; y: number; z: number }
+export interface AuditoriumStageConfig { enabled: boolean; type: 'multiplex' | 'grand'; height: number; depth: number; width: number; edgeLighting: boolean }
 export interface AuditoriumCategoryConfig { premiumFromRow: number; vipFromRow: number }
 export interface AuditoriumLayoutConfig {
   id: string; revision: string; name: string; preset: AuditoriumPresetId; style: AuditoriumStyle
   rows: number; sections: AuditoriumSectionConfig[]; aisleWidth: number; seatSpacing: number
   rowSpacing: number; rowRise: number; firstRowElevation: number; curvature: number
-  seatScale: number; screen: AuditoriumScreenConfig; categories: AuditoriumCategoryConfig
+  seatScale: number; screen: AuditoriumScreenConfig; stage: AuditoriumStageConfig; categories: AuditoriumCategoryConfig
 }
 export interface Auditorium { id: string; name: string; rows: number; seatsPerRow: number; layoutRevision?: string }
 export interface Seat {

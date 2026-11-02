@@ -75,7 +75,22 @@ function CinematicScreen({ layout }: { layout: GeneratedAuditoriumLayout }) {
   }, [])
   useEffect(() => () => texture.dispose(), [texture])
   const { screen } = layout.config
-  return <group><mesh position={[0, screen.y, screen.z - .12]}><boxGeometry args={[screen.width + .55, screen.height + .55, .24]} /><meshStandardMaterial color="#090a0e" metalness={.6} roughness={.3} /></mesh><mesh position={[0, screen.y, screen.z]}><planeGeometry args={[screen.width, screen.height]} /><meshBasicMaterial map={texture} toneMapped={false} side={THREE.DoubleSide} /></mesh></group>
+  const panelX = screen.width / 2 + .8
+  return <group><mesh position={[0, screen.y, screen.z - .12]}><boxGeometry args={[screen.width + .55, screen.height + .55, .24]} /><meshStandardMaterial color="#090a0e" metalness={.6} roughness={.3} /></mesh><mesh position={[0, screen.y, screen.z]}><planeGeometry args={[screen.width, screen.height]} /><meshBasicMaterial map={texture} toneMapped={false} side={THREE.DoubleSide} /></mesh>{[-1,1].map(side=><group key={side} position={[side*panelX,screen.y,screen.z-.08]}>{[-1,0,1].map(offset=><mesh key={offset} position={[0,offset*1.35,0]}><boxGeometry args={[.85,1.15,.12]}/><meshStandardMaterial color="#21080d" roughness={.92}/></mesh>)}</group>)}</group>
+}
+
+function FrontStage({ layout }: { layout: GeneratedAuditoriumLayout }) {
+  const { screen, stage } = layout.config
+  if (!stage.enabled) return null
+  const centerZ = screen.z + .45 + stage.depth / 2
+  const frontZ = screen.z + .45 + stage.depth
+  const grand = stage.type === 'grand'
+  return <group>
+    <mesh position={[0,stage.height/2,centerZ]}><boxGeometry args={[stage.width,stage.height,stage.depth]}/><meshStandardMaterial color={grand?'#181113':'#151416'} roughness={.82} metalness={.08}/></mesh>
+    {grand&&<mesh position={[0,stage.height*.55,frontZ+.035]}><boxGeometry args={[stage.width+.08,stage.height*.42,.07]}/><meshStandardMaterial color="#5b171d" roughness={.66} metalness={.2}/></mesh>}
+    {stage.edgeLighting&&<mesh position={[0,stage.height+.018,frontZ-.035]}><boxGeometry args={[stage.width-.18,.035,.055]}/><meshBasicMaterial color={CLASSIC_RED_THEME.amber} transparent opacity={.78}/></mesh>}
+    {grand&&[-1,1].map(side=><group key={side} position={[side*(stage.width/2+.58),0,frontZ-.5]}>{[0,1,2].map(index=><mesh key={index} position={[0,(index+1)*stage.height/6,-index*.24]}><boxGeometry args={[1.05,stage.height/3,.5]}/><meshStandardMaterial color="#201719" roughness={.86}/></mesh>)}</group>)}
+  </group>
 }
 
 function TierArchitecture({ layout, carpet }: { layout: GeneratedAuditoriumLayout; carpet: THREE.Texture }) {
@@ -109,9 +124,9 @@ function Room({ layout, interactive, selectedSeatId, onSeatSelect, reclineAngle 
   const proceduralSeat = (seat: Seat) => <CinemaSeat seat={seat} resources={resources} scale={layout.config.seatScale} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle} />
   return <>
   <ambientLight intensity={.38} /><hemisphereLight color="#ffe3bd" groundColor="#190305" intensity={.34} /><spotLight position={[0, 10, layout.config.screen.z + 2]} intensity={68} angle={1.15} penumbra={.95} color="#f8e7d0" /><pointLight position={[0, layout.config.screen.y, layout.config.screen.z + 1]} color="#f4e2cd" intensity={8} distance={18} /><pointLight position={[-7, .45, 6]} color={CLASSIC_RED_THEME.amber} intensity={8} distance={15} /><pointLight position={[8, .45, 6]} color={CLASSIC_RED_THEME.amber} intensity={8} distance={15} />
-  <mesh position={[0, 2.5, layout.config.screen.z - .25]}><boxGeometry args={[layout.config.screen.width + 4, 7, .3]} /><meshStandardMaterial color="#0b1324" /></mesh><CinematicScreen layout={layout} /><Text position={[0, layout.config.screen.y + layout.config.screen.height / 2 + .55, layout.config.screen.z + .05]} fontSize={.28} color="#38bdf8">CINEVERSE · {layout.config.name.toUpperCase()}</Text>
+  <mesh position={[0, 3.85, layout.config.screen.z - .25]}><boxGeometry args={[layout.config.screen.width + 4, 7.7, .3]} /><meshStandardMaterial color="#18070b" roughness={.94} /></mesh><CinematicScreen layout={layout} /><Text position={[0, layout.config.screen.y + layout.config.screen.height / 2 + .42, layout.config.screen.z + .05]} fontSize={.28} color="#c58a35">CINEVERSE · {layout.config.name.toUpperCase()}</Text>
   <mesh position={[0, -.2, layout.depth / 2 + layout.config.screen.z]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[layout.width + 5, layout.depth + 8]} /><meshStandardMaterial map={carpet} color="#ffffff" roughness={.94} metalness={0} /></mesh>
-  <TierArchitecture layout={layout} carpet={carpet} />
+  <FrontStage layout={layout}/><TierArchitecture layout={layout} carpet={carpet} />
   {layout.seats.map(seat => seat.id === prototypeSeatId ? <SeatAssetBoundary key={seat.id} fallback={proceduralSeat(seat)}><Suspense fallback={proceduralSeat(seat)}><RealisticCinemaSeat seat={seat} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle}/></Suspense></SeatAssetBoundary> : <CinemaSeat key={seat.id} seat={seat} resources={resources} scale={layout.config.seatScale} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={reclineAngle} />)}
   <mesh position={[-layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} roughness={.88} /></mesh><mesh position={[layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} roughness={.88} /></mesh><mesh position={[0, 7.85, layout.depth / 2 + layout.config.screen.z]} rotation={[Math.PI/2,0,0]}><planeGeometry args={[layout.width + .5, layout.depth + 6]} /><meshStandardMaterial color={CLASSIC_RED_THEME.ceiling} roughness={.95} side={THREE.DoubleSide} /></mesh><WallAccents layout={layout} />
   </> }

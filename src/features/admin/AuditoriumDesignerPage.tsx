@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button'
 import type { AuditoriumLayoutConfig } from '../../types/domain'
 import { AuditoriumScene } from '../auditorium/scene/AuditoriumScene'
 import { SeatMap2D } from '../auditorium/components/SeatMap2D'
-import { generateAuditoriumLayout, getAuditoriumPreset, PRESET_ORDER, validateLayoutConfig } from '../auditorium/utils/layoutEngine'
+import { generateAuditoriumLayout, getAuditoriumPreset, normalizeLayoutConfig, PRESET_ORDER, validateLayoutConfig } from '../auditorium/utils/layoutEngine'
 import { useBookingStore } from '../../stores/bookingStore'
 
 const STORAGE_KEY = 'cineverse.auditorium.layout.v2'
@@ -12,7 +12,8 @@ const STORAGE_KEY = 'cineverse.auditorium.layout.v2'
 function savedConfig(): AuditoriumLayoutConfig {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as AuditoriumLayoutConfig | null
-    return parsed && validateLayoutConfig(parsed).valid ? parsed : getAuditoriumPreset('classic')
+    const migrated = parsed ? normalizeLayoutConfig(parsed) : null
+    return migrated && validateLayoutConfig(migrated).valid ? migrated : getAuditoriumPreset('classic')
   } catch { return getAuditoriumPreset('classic') }
 }
 

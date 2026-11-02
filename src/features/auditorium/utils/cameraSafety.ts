@@ -30,7 +30,8 @@ export function createCameraSafetyBounds(layout: GeneratedAuditoriumLayout): Cam
   const highestTier = Math.max(0, ...layout.seats.map(seat => seat.y))
   const seatGrid = new Map<string, Seat[]>(); const platformGrid = new Map<string, RowPlatform[]>()
   layout.seats.forEach(seat => addToGrid(seatGrid, seat)); layout.platforms.forEach(platform => addPlatformToGrid(platformGrid, platform))
-  return { minX: -halfWidth + .55, maxX: halfWidth - .55, minZ, maxZ, minY: .55, maxY: Math.max(7.4, highestTier + 5.2), targetMinY: .25, targetMaxY: highestTier + 2.1, highestTier, maxDistance: Math.hypot(layout.width, layout.depth) * .78, seatGrid, platformGrid }
+  if (layout.config.stage.enabled) addPlatformToGrid(platformGrid, { id:'front-stage', rowIndex:-1, x:0, y:layout.config.stage.height-.18, z:layout.config.screen.z+.45+layout.config.stage.depth/2, rotation:0, width:layout.config.stage.width, depth:layout.config.stage.depth })
+  return { minX: -halfWidth + .55, maxX: halfWidth - .55, minZ, maxZ, minY: .55, maxY: Math.max(7.4, highestTier + 5.2), targetMinY: .25, targetMaxY: Math.max(highestTier + 2.1, layout.config.screen.y + .5), highestTier, maxDistance: Math.hypot(layout.width, layout.depth) * .78, seatGrid, platformGrid }
 }
 
 function nearby<T>(grid: Map<string, T[]>, point: THREE.Vector3) {

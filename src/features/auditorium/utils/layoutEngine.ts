@@ -10,35 +10,42 @@ export const AUDITORIUM_PRESETS: Record<Exclude<AuditoriumPresetId, 'custom'>, A
   classic: {
     id: 'classic', revision: 'classic-v1', name: 'Classic Three-Section', preset: 'classic', style: 'classic', rows: 9,
     sections: [{ id: 'left', label: 'Left', seats: 4 }, { id: 'center', label: 'Center', seats: 8 }, { id: 'right', label: 'Right', seats: 4 }],
-    aisleWidth: 1.7, seatSpacing: 1.18, rowSpacing: 1.5, rowRise: .2, firstRowElevation: .18, curvature: 0, seatScale: 1, screen: { width: 16, height: 4.8, y: 2.8, z: -7.5 }, categories: { premiumFromRow: 4, vipFromRow: 7 },
+    aisleWidth: 1.7, seatSpacing: 1.18, rowSpacing: 1.5, rowRise: .2, firstRowElevation: .18, curvature: 0, seatScale: 1, screen: { width: 16, height: 4.8, bottomElevation: 1.5, y: 3.9, z: -7.5 }, stage: { enabled: true, type: 'multiplex', height: .3, depth: 1.5, width: 17.5, edgeLighting: true }, categories: { premiumFromRow: 4, vipFromRow: 7 },
   },
   vip: {
     id: 'vip', revision: 'vip-v1', name: 'Luxury VIP Theater', preset: 'vip', style: 'luxury', rows: 6,
     sections: [{ id: 'left', label: 'Left', seats: 2 }, { id: 'center', label: 'Center', seats: 4 }, { id: 'right', label: 'Right', seats: 2 }],
-    aisleWidth: 2, seatSpacing: 1.7, rowSpacing: 2.15, rowRise: .31, firstRowElevation: .2, curvature: 0, seatScale: 1.24, screen: { width: 13, height: 4.4, y: 2.7, z: -8 }, categories: { premiumFromRow: 0, vipFromRow: 0 },
+    aisleWidth: 2, seatSpacing: 1.7, rowSpacing: 2.15, rowRise: .31, firstRowElevation: .2, curvature: 0, seatScale: 1.24, screen: { width: 13, height: 4.4, bottomElevation: 1.5, y: 3.7, z: -8 }, stage: { enabled: true, type: 'multiplex', height: .3, depth: 1.5, width: 14.5, edgeLighting: true }, categories: { premiumFromRow: 0, vipFromRow: 0 },
   },
   grand: {
     id: 'grand', revision: 'grand-v1', name: 'Grand Curved Theater', preset: 'grand', style: 'grand', rows: 11,
     sections: [{ id: 'left', label: 'Left', seats: 6 }, { id: 'center', label: 'Center', seats: 12 }, { id: 'right', label: 'Right', seats: 6 }],
-    aisleWidth: 1.65, seatSpacing: 1.05, rowSpacing: 1.5, rowRise: .22, firstRowElevation: .18, curvature: .75, seatScale: .96, screen: { width: 21, height: 6, y: 3.4, z: -8.5 }, categories: { premiumFromRow: 5, vipFromRow: 9 },
+    aisleWidth: 1.65, seatSpacing: 1.05, rowSpacing: 1.5, rowRise: .22, firstRowElevation: .18, curvature: .75, seatScale: .96, screen: { width: 21, height: 6, bottomElevation: 1.5, y: 4.5, z: -8.5 }, stage: { enabled: true, type: 'grand', height: .45, depth: 2.2, width: 23, edgeLighting: true }, categories: { premiumFromRow: 5, vipFromRow: 9 },
   },
   boutique: {
     id: 'boutique', revision: 'boutique-v1', name: 'Boutique Theater', preset: 'boutique', style: 'boutique', rows: 6,
     sections: [{ id: 'left', label: 'Left', seats: 3 }, { id: 'right', label: 'Right', seats: 4 }],
-    aisleWidth: 1.5, seatSpacing: 1.3, rowSpacing: 1.65, rowRise: .22, firstRowElevation: .18, curvature: .08, seatScale: 1.08, screen: { width: 11, height: 3.7, y: 2.45, z: -6.8 }, categories: { premiumFromRow: 0, vipFromRow: 4 },
+    aisleWidth: 1.5, seatSpacing: 1.3, rowSpacing: 1.65, rowRise: .22, firstRowElevation: .18, curvature: .08, seatScale: 1.08, screen: { width: 11, height: 3.7, bottomElevation: 1.5, y: 3.35, z: -6.8 }, stage: { enabled: true, type: 'multiplex', height: .3, depth: 1.4, width: 12.5, edgeLighting: true }, categories: { premiumFromRow: 0, vipFromRow: 4 },
   },
 }
 
 export const PRESET_ORDER: Exclude<AuditoriumPresetId, 'custom'>[] = ['classic', 'vip', 'grand', 'boutique']
 
-const cloneConfig = (config: AuditoriumLayoutConfig): AuditoriumLayoutConfig => ({ ...config, sections: config.sections.map(section => ({ ...section })), screen: { ...config.screen }, categories: { ...config.categories } })
+export function normalizeLayoutConfig(config: AuditoriumLayoutConfig): AuditoriumLayoutConfig {
+  const bottomElevation = Number.isFinite(config.screen.bottomElevation) ? config.screen.bottomElevation : 1.5
+  const grand = config.preset === 'grand' || config.style === 'grand'
+  const stage = config.stage ?? { enabled: true, type: grand ? 'grand' : 'multiplex', height: grand ? .45 : .3, depth: grand ? 2.2 : 1.5, width: config.screen.width + (grand ? 2 : 1.5), edgeLighting: true }
+  return { ...config, sections: config.sections.map(section => ({ ...section })), screen: { ...config.screen, bottomElevation, y: bottomElevation + config.screen.height / 2 }, stage: { ...stage }, categories: { ...config.categories } }
+}
+const cloneConfig = (config: AuditoriumLayoutConfig): AuditoriumLayoutConfig => normalizeLayoutConfig(config)
 export function getAuditoriumPreset(id: Exclude<AuditoriumPresetId, 'custom'>) { return cloneConfig(AUDITORIUM_PRESETS[id]) }
 export function getPresetFromRevision(revision: string) {
   const preset = PRESET_ORDER.find(id => revision.startsWith(`${id}-`)) ?? 'classic'
   return getAuditoriumPreset(preset)
 }
 
-export function validateLayoutConfig(config: AuditoriumLayoutConfig): LayoutValidation {
+export function validateLayoutConfig(input: AuditoriumLayoutConfig): LayoutValidation {
+  const config = normalizeLayoutConfig(input)
   const errors: string[] = []
   if (!config.name.trim()) errors.push('Auditorium name is required.')
   if (!Number.isInteger(config.rows) || config.rows < 3 || config.rows > 14) errors.push('Rows must be a whole number between 3 and 14.')
@@ -51,6 +58,10 @@ export function validateLayoutConfig(config: AuditoriumLayoutConfig): LayoutVali
   if (config.rowRise < .1 || config.rowRise > .5) errors.push('Row elevation must be between 0.1m and 0.5m.')
   if (config.curvature < 0 || config.curvature > .9) errors.push('Curvature must be between 0 and 0.9.')
   if (config.screen.width < 7 || config.screen.width > 26 || config.screen.height < 2.5 || config.screen.height > 8) errors.push('Screen dimensions are outside the supported range.')
+  if (config.screen.bottomElevation < 0 || config.screen.bottomElevation > 4) errors.push('Screen bottom elevation must be between 0m and 4m.')
+  if (config.stage.height < .15 || config.stage.height > 1.2 || config.stage.depth < .8 || config.stage.depth > 5 || config.stage.width < 7 || config.stage.width > 30) errors.push('Stage dimensions are outside the supported range.')
+  if (config.stage.enabled && config.stage.height + .25 >= config.screen.bottomElevation) errors.push('Stage is too high for the configured screen-bottom clearance.')
+  if (config.stage.enabled && config.stage.depth + .45 > Math.abs(config.screen.z) - 1) errors.push('Stage depth must leave at least 1m clearance before the first seating row.')
   if (config.categories.premiumFromRow < 0 || config.categories.premiumFromRow >= config.rows || config.categories.vipFromRow < config.categories.premiumFromRow || config.categories.vipFromRow >= config.rows) errors.push('Seat category row ranges are invalid.')
   return { valid: errors.length === 0, errors }
 }
@@ -90,7 +101,7 @@ function sectionSeatOffsets(config: AuditoriumLayoutConfig) {
 }
 
 export function generateAuditoriumLayout(input: AuditoriumLayoutConfig, availabilityScope?: string): GeneratedAuditoriumLayout {
-  const config = cloneConfig(input)
+  const config = normalizeLayoutConfig(input)
   if (config.preset === 'custom') config.revision = customRevision(config)
   const validation = validateLayoutConfig(config)
   if (!validation.valid) throw new Error(validation.errors.join(' '))

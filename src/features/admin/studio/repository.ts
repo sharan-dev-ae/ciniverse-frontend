@@ -1,7 +1,8 @@
 import type { StudioProject } from './types'
+import { normalizeLayoutConfig } from '../../auditorium/utils/layoutEngine'
 
 const KEY = 'cineverse.theater-studio.projects.v1'
-const read = (): StudioProject[] => { try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') as StudioProject[] } catch { return [] } }
+const read = (): StudioProject[] => { try { return (JSON.parse(localStorage.getItem(KEY) ?? '[]') as StudioProject[]).map(project => ({ ...project, config: normalizeLayoutConfig(project.config) })) } catch { return [] } }
 const write = (projects: StudioProject[]) => localStorage.setItem(KEY, JSON.stringify(projects))
 
 export const studioRepository = {
