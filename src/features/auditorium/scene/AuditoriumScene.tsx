@@ -7,6 +7,7 @@ import type { Seat } from '../../../types/domain'
 import { useBookingStore } from '../../../stores/bookingStore'
 import { DEFAULT_SEAT_VIEW, getLookAtQuaternion, getModePose, getSeatWorldPosition, type CameraMode, type SeatViewCalibration } from '../utils/camera'
 import type { GeneratedAuditoriumLayout } from '../utils/layoutEngine'
+import { calculateSightline, getSightlineVisibility } from '../utils/sightline'
 
 export type { CameraMode } from '../utils/camera'
 const stateColors = { available: '#173d7a', selected: '#2563eb', held: '#38bdf8', booked: '#334155', disabled: '#111827' }
@@ -33,6 +34,19 @@ function CinemaSeat({ seat, resources, scale, interactive, selectedSeatId, onSea
 }
 
 interface SavedCamera { position: THREE.Vector3; quaternion: THREE.Quaternion; target: THREE.Vector3; fov: number }
+function SightlineVisualization({ seat, screenCenter, seatView, mode, enabled }: { seat: Seat | null; screenCenter: THREE.Vector3; seatView: SeatViewCalibration; mode: CameraMode; enabled: boolean }) {
+  const visibility = getSightlineVisibility(enabled, !!seat, mode)
+  const measurement = useMemo(() => seat ? calculateSightline(seat, screenCenter, seatView) : null, [screenCenter, seat, seatView])
+  const geometry = useMemo(() => measurement ? new THREE.BufferGeometry().setFromPoints([measurement.origin, measurement.target]) : null, [measurement])
+  useEffect(() => () => geometry?.dispose(), [geometry])
+  if (!visibility.visible || !measurement) return null
+  return <group raycast={() => undefined}>
+    {visibility.showBeam && geometry && <lineSegments geometry={geometry} raycast={() => undefined}><lineBasicMaterial color="#FACC15" transparent opacity={.9} blending={THREE.AdditiveBlending} depthWrite={false} /></lineSegments>}
+    {visibility.showEyeMarker && <mesh position={measurement.origin} raycast={() => undefined}><sphereGeometry args={[.085, 12, 12]} /><meshBasicMaterial color="#FACC15" transparent opacity={.9} depthWrite={false} /></mesh>}
+    {visibility.showScreenMarker && <mesh position={[measurement.target.x, measurement.target.y, measurement.target.z + .035]} raycast={() => undefined}><ringGeometry args={[.12, .19, 24]} /><meshBasicMaterial color="#FACC15" transparent opacity={.85} side={THREE.DoubleSide} depthWrite={false} /></mesh>}
+  </group>
+}
+
 function CameraController({ mode, seat, screenCenter, overviewTarget, overviewPosition, controls, seatView }: { mode: CameraMode; seat: Seat | null; screenCenter: THREE.Vector3; overviewTarget: THREE.Vector3; overviewPosition: THREE.Vector3; controls: React.RefObject<OrbitControlsImpl | null>; seatView: SeatViewCalibration }) {
   const { camera } = useThree()
   const previousMode = useRef<CameraMode>('overview')
@@ -121,10 +135,10 @@ function Room({ layout, interactive, selectedSeatId, onSeatSelect, reclineAngle 
   <mesh position={[-layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} /></mesh><mesh position={[layout.width / 2, 4, layout.depth / 2 + layout.config.screen.z]}><boxGeometry args={[.3, 8, layout.depth + 6]} /><meshStandardMaterial color={wallColor} /></mesh>
   </> }
 
-export function AuditoriumScene({ layout, mode, focusedSeat, interactive = true, selectedSeatId, onSeatSelect, seatView = DEFAULT_SEAT_VIEW }: { layout: GeneratedAuditoriumLayout; mode: CameraMode; focusedSeat: Seat | null; interactive?: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; seatView?: SeatViewCalibration }) {
+export function AuditoriumScene({ layout, mode, focusedSeat, interactive = true, selectedSeatId, onSeatSelect, seatView = DEFAULT_SEAT_VIEW, showSightline = false }: { layout: GeneratedAuditoriumLayout; mode: CameraMode; focusedSeat: Seat | null; interactive?: boolean; selectedSeatId?: string | null; onSeatSelect?: (seat: Seat) => void; seatView?: SeatViewCalibration; showSightline?: boolean }) {
   const controls = useRef<OrbitControlsImpl>(null)
   const screenCenter = useMemo(() => new THREE.Vector3(0, layout.config.screen.y, layout.config.screen.z), [layout.config.screen.y, layout.config.screen.z])
   const overviewTarget = useMemo(() => new THREE.Vector3(0, 2, Math.max(3, layout.config.rows * layout.config.rowSpacing * .45)), [layout.config.rowSpacing, layout.config.rows])
   const overviewPosition = useMemo(() => new THREE.Vector3(0, Math.max(10, layout.config.rows), Math.max(18, layout.depth * .7)), [layout.config.rows, layout.depth])
-  return <Canvas camera={{ position: overviewPosition, fov: 48 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}><color attach="background" args={['#080f20']} /><fog attach="fog" args={['#080f20', layout.depth * .7, layout.depth * 1.8]} /><Suspense fallback={<Html center><span className="text-sm text-white">Preparing auditorium…</span></Html>}><Room layout={layout} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={seatView.reclineAngle} /></Suspense><CameraController key={layout.config.revision} mode={mode} seat={focusedSeat} screenCenter={screenCenter} overviewTarget={overviewTarget} overviewPosition={overviewPosition} controls={controls} seatView={seatView} /><OrbitControls ref={controls} enablePan minDistance={8} maxDistance={Math.max(32, layout.depth)} minPolarAngle={.3} maxPolarAngle={1.48} target={overviewTarget} /></Canvas>
+  return <Canvas camera={{ position: overviewPosition, fov: 48 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: 'high-performance' }}><color attach="background" args={['#080f20']} /><fog attach="fog" args={['#080f20', layout.depth * .7, layout.depth * 1.8]} /><Suspense fallback={<Html center><span className="text-sm text-white">Preparing auditorium…</span></Html>}><Room layout={layout} interactive={interactive} selectedSeatId={selectedSeatId} onSeatSelect={onSeatSelect} reclineAngle={seatView.reclineAngle} /><SightlineVisualization seat={focusedSeat} screenCenter={screenCenter} seatView={seatView} mode={mode} enabled={showSightline} /></Suspense><CameraController key={layout.config.revision} mode={mode} seat={focusedSeat} screenCenter={screenCenter} overviewTarget={overviewTarget} overviewPosition={overviewPosition} controls={controls} seatView={seatView} /><OrbitControls ref={controls} enablePan minDistance={8} maxDistance={Math.max(32, layout.depth)} minPolarAngle={.3} maxPolarAngle={1.48} target={overviewTarget} /></Canvas>
 }
