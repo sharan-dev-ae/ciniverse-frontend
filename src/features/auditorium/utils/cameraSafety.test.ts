@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { generatePresetLayout, PRESET_ORDER } from './layoutEngine'
-import { clampCameraTarget, collidesWithSeat, createCameraSafetyBounds, getFloorHeight, getSafeOverviewPose, isValidOverviewPosition, ORBIT_LIMITS, resolveCameraPosition } from './cameraSafety'
+import { clampCameraTarget, collidesWithSeat, constrainOverviewPosition, createCameraSafetyBounds, getFloorHeight, getSafeOverviewPose, isValidOverviewPosition, ORBIT_LIMITS, resolveCameraPosition } from './cameraSafety'
 
 describe('orbit limits', () => {
   it('prevents below-floor rotation and keeps a useful upper orbit', () => {
@@ -34,5 +34,14 @@ describe('collision and recovery', () => {
   })
   it('recovers non-finite camera states to the last valid position', () => {
     expect(resolveCameraPosition(bounds, reset.position, new THREE.Vector3(NaN, 0, 0)).equals(reset.position)).toBe(true)
+  })
+  it('does not oscillate under repeated input into a boundary', () => {
+    const current = reset.position.clone(); const blocked = new THREE.Vector3(bounds.maxX + 5, current.y, current.z); const first = constrainOverviewPosition(bounds, current, blocked)
+    for (let index = 0; index < 20; index += 1) expect(constrainOverviewPosition(bounds, first, blocked).distanceTo(first)).toBeLessThan(1e-9)
+  })
+  it('preserves movement parallel to a wall and permits immediate movement away', () => {
+    const atWall = new THREE.Vector3(bounds.maxX, 4, reset.position.z); const slide = constrainOverviewPosition(bounds, atWall, new THREE.Vector3(bounds.maxX + 2, 4, atWall.z - 1))
+    expect(slide.x).toBe(bounds.maxX); expect(slide.z).toBeLessThan(atWall.z)
+    const away = constrainOverviewPosition(bounds, atWall, new THREE.Vector3(bounds.maxX - 1, 4, atWall.z)); expect(away.x).toBeLessThan(atWall.x)
   })
 })

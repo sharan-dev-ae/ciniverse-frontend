@@ -78,6 +78,30 @@ export function resolveCameraPosition(bounds: CameraSafetyBounds, lastValid: THR
   return output
 }
 
+/** Projects a proposed overview position onto valid room, floor and seat
+ * boundaries. Radial seat projection preserves motion tangent to the obstacle,
+ * so ordinary navigation never needs a last-position rollback. */
+export function constrainOverviewPosition(bounds: CameraSafetyBounds, current: THREE.Vector3, proposed: THREE.Vector3, output = new THREE.Vector3()) {
+  if (![proposed.x, proposed.y, proposed.z].every(Number.isFinite)) return output.copy(current)
+  output.set(
+    THREE.MathUtils.clamp(proposed.x, bounds.minX, bounds.maxX),
+    Math.min(proposed.y, bounds.maxY),
+    THREE.MathUtils.clamp(proposed.z, bounds.minZ, bounds.maxZ),
+  )
+  output.y = Math.max(output.y, bounds.minY, getFloorHeight(bounds, output) + .48)
+  nearby(bounds.seatGrid, output).forEach(seat => {
+    const clearanceRadius = (seat.category === 'vip' ? .7 : .53) + .32
+    if (output.y <= seat.y - .2 || output.y >= seat.y + 1.67) return
+    let dx = output.x - seat.x; let dz = output.z - seat.z; const distance = Math.hypot(dx, dz)
+    if (distance >= clearanceRadius) return
+    if (distance < 1e-6) { dx = current.x - seat.x; dz = current.z - seat.z; if (Math.hypot(dx, dz) < 1e-6) dz = 1 }
+    const scale = clearanceRadius / Math.hypot(dx, dz)
+    output.x = THREE.MathUtils.clamp(seat.x + dx * scale, bounds.minX, bounds.maxX)
+    output.z = THREE.MathUtils.clamp(seat.z + dz * scale, bounds.minZ, bounds.maxZ)
+  })
+  return output
+}
+
 export function getSafeOverviewPose(bounds: CameraSafetyBounds) {
   const target = new THREE.Vector3(0, Math.max(1.2, bounds.highestTier * .55), THREE.MathUtils.lerp(bounds.minZ, bounds.maxZ, .43))
   const position = new THREE.Vector3(0, Math.min(bounds.maxY - .2, bounds.highestTier + 5), bounds.maxZ - .8)
